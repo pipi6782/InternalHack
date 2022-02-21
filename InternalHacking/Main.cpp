@@ -2,7 +2,9 @@
 #include "Proc.h"
 #include "Mem.h"
 
-#define IDC_INFAMMO_BUTTON 100
+#define IDC_INFAMMO 100
+#define IDC_SPEEDHACK 101
+#define IDC_APPLYSPEED 102
 
 #define DLL_EXPORT extern "C" __declspec(dllexport)
 
@@ -12,9 +14,13 @@ HWND g_hWnd;
 DWORD procID;
 uintptr_t moduleBase;
 HANDLE hProcess;
-vector<UINT> bulletOffsets = { 0xD28,0x38,0,0x30,0x260,0x4F8 };
+vector<UINT> characterOffsets = { 0xD28,0x38,0,0x30,0x260 };
+vector<UINT> bulletOffsets = { 0x4F8 };
+vector<UINT> movementOffsets = { 0x288 };
+UINT jumpZVelocityoffset = 0x188;
+UINT maxWalkSpeedOffset = 0x18C;
 uintptr_t engineAddress;
-
+bool bInfAmmo = false;
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 
@@ -100,10 +106,8 @@ DWORD WINAPI HackThread(HMODULE hModule)
 	}
 
 	ShowWindow(g_hWnd, SW_SHOW);
-	MessageBox(nullptr, L"result false", L"result false", MB_OK);
 
 	UpdateWindow(g_hWnd);
-	MessageBox(nullptr, L"update false", L"update false", MB_OK);
 
 	procID = Proc::Get()->GetProcID(L"Personal-Win64-Shipping.exe");
 
@@ -125,7 +129,7 @@ DWORD WINAPI HackThread(HMODULE hModule)
 		return 0;
 	}
 
-	while(true)
+	while (true)
 	{
 		if (PeekMessage(&msg, g_hWnd, 0, 0, PM_REMOVE))
 		{
@@ -138,7 +142,7 @@ DWORD WINAPI HackThread(HMODULE hModule)
 	}
 
 	FreeLibraryAndExitThread(hModule, 0);
-	return msg.wParam;
+	return (DWORD)msg.wParam;
 }
 
 void RegisterWndClass()
@@ -147,7 +151,7 @@ void RegisterWndClass()
 
 	wndClass.cbClsExtra = 0;
 	wndClass.cbWndExtra = 0;
-	wndClass.hbrBackground = CreateSolidBrush(0xFF0000);
+	wndClass.hbrBackground = CreateSolidBrush(COLORREF(0xf0f0f0));
 	wndClass.hCursor = LoadCursor(NULL, IDC_ARROW);
 	wndClass.hIcon = NULL;
 	wndClass.hInstance = hInstance;
@@ -238,28 +242,61 @@ int APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserve
 
 LRESULT WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
-	HWND hInfiniteAmmo;
-	bool bInfAmmo = false;
+	static HWND hInfiniteAmmo;
+	static HWND hSpeedHack;
+	static HWND hApplySpeed;
+	static char str[256];
+	HDC hdc;
+	PAINTSTRUCT ps;
 	switch (message)
 	{
 	case WM_CREATE:
-		hInfiniteAmmo = CreateWindow(L"BUTTON", L"InfAmmo", WS_VISIBLE | WS_CHILD, 100, 100, 100, 100, hWnd, (HMENU)IDC_INFAMMO_BUTTON, hInstance, NULL);
+		hInfiniteAmmo = CreateWindow(L"BUTTON", L"InfAmmo", WS_VISIBLE | WS_CHILD | BS_CHECKBOX, 20, 20, 100, 25, hWnd, (HMENU)IDC_INFAMMO, hInstance, NULL);
+		hSpeedHack = CreateWindow(L"edit", 0, WS_CHILD | WS_VISIBLE | WS_BORDER, 100, 50, 100, 25, hWnd, (HMENU)IDC_SPEEDHACK, hInstance, NULL);
+		hApplySpeed = CreateWindow(L"BUTTON", L"ApplySpeed", WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON, 210, 50, 100, 25, hWnd, (HMENU)IDC_APPLYSPEED, hInstance, NULL);
 		break;
 		
 	case WM_COMMAND:
-		switch (HIWORD(wParam))
+		switch (LOWORD(wParam))
 		{
-		case IDC_INFAMMO_BUTTON:
+		case IDC_INFAMMO:
 			bInfAmmo = !bInfAmmo;
 			if (bInfAmmo == true)
 			{
-				uintptr_t bulletAddress = Proc::Get()->FindDMAAddy(engineAddress, bulletOffsets);
-				*(int*)(bulletAddress) = 1002;
+				SendMessage(hInfiniteAmmo, BM_SETCHECK, BST_CHECKED, 0);
+				Mem::Get()->Nop((BYTE*)(moduleBase + 0xE11312), 7);
 			}
+			else
+			{
+				SendMessage(hInfiniteAmmo, BM_SETCHECK, BST_UNCHECKED, 0);
+				Mem::Get()->Patch((BYTE*)(moduleBase + 0xE11312), (BYTE*)"\x83\x87\xF8\x04\x00\x00\xFE", 7);
+			}
+			break;
+
+		case IDC_SPEEDHACK :
+			switch (HIWORD(wParam))
+			{
+			case EN_CHANGE:
+				GetWindowText(hSpeedHack, (LPWSTR)str, 256);
+				break;
+			}
+			break;
+
+		case IDC_APPLYSPEED:
+			uintptr_t temp = Proc::Get()->FindDMAAddy(engineAddress, characterOffsets);
+			temp = Proc::Get()->FindDMAAddy(temp, characterOffsets);
+			temp = Proc::Get()->FindDMAAddy(temp, { maxWalkSpeedOffset });
+			*((float*)temp) = 3000.0f;
 			break;
 		}
 
 
+		break;
+
+	case WM_PAINT:
+		hdc = BeginPaint(hWnd, &ps);
+		TextOut(hdc, 20, 50, TEXT("Speed : "), sizeof("Speed : ")-1);
+		EndPaint(hWnd, &ps);
 		break;
 
 	case WM_DESTROY:
