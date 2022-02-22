@@ -4,7 +4,7 @@
 
 #define IDC_INFAMMO 100
 #define IDC_SPEEDHACK 101
-#define IDC_APPLYSPEED 102
+#define IDC_HIGHJUMP 102
 
 #define DLL_EXPORT extern "C" __declspec(dllexport)
 
@@ -15,12 +15,13 @@ DWORD procID;
 uintptr_t moduleBase;
 HANDLE hProcess;
 vector<UINT> characterOffsets = { 0xD28,0x38,0,0x30,0x260 };
-vector<UINT> bulletOffsets = { 0x4F8 };
-vector<UINT> movementOffsets = { 0x288 };
-UINT jumpZVelocityoffset = 0x188;
-UINT maxWalkSpeedOffset = 0x18C;
+vector<UINT> bulletOffsets = { 0xD28,0x38,0,0x30,0x260, 0x4F8 };
+vector<UINT> maxWalkSpeedOffset = { 0xD28,0x38,0,0x30,0x260, 0x288,0x18C };
+vector<UINT> jumpZVelocityoffset = { 0xD28,0x38,0,0x30,0x260, 0x288,0x158 };
 uintptr_t engineAddress;
 bool bInfAmmo = false;
+bool bSpeedHack = false;
+bool bHighJump = false;
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 
@@ -244,16 +245,15 @@ LRESULT WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	static HWND hInfiniteAmmo;
 	static HWND hSpeedHack;
-	static HWND hApplySpeed;
+	static HWND hHighJump;
 	static char str[256];
-	HDC hdc;
-	PAINTSTRUCT ps;
+
 	switch (message)
 	{
 	case WM_CREATE:
 		hInfiniteAmmo = CreateWindow(L"BUTTON", L"InfAmmo", WS_VISIBLE | WS_CHILD | BS_CHECKBOX, 20, 20, 100, 25, hWnd, (HMENU)IDC_INFAMMO, hInstance, NULL);
-		hSpeedHack = CreateWindow(L"edit", 0, WS_CHILD | WS_VISIBLE | WS_BORDER, 100, 50, 100, 25, hWnd, (HMENU)IDC_SPEEDHACK, hInstance, NULL);
-		hApplySpeed = CreateWindow(L"BUTTON", L"ApplySpeed", WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON, 210, 50, 100, 25, hWnd, (HMENU)IDC_APPLYSPEED, hInstance, NULL);
+		hSpeedHack = CreateWindow(L"BUTTON", L"Super Fast!!!!!", WS_VISIBLE | WS_CHILD | BS_CHECKBOX, 20, 50, 100, 25, hWnd, (HMENU)IDC_SPEEDHACK, hInstance, NULL);
+		hHighJump = CreateWindow(L"BUTTON", L"Jump High", WS_VISIBLE | WS_CHILD | BS_CHECKBOX, 20, 80, 100, 25, hWnd, (HMENU)IDC_HIGHJUMP, hInstance, NULL);
 		break;
 		
 	case WM_COMMAND:
@@ -273,30 +273,40 @@ LRESULT WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			}
 			break;
 
-		case IDC_SPEEDHACK :
-			switch (HIWORD(wParam))
+		case IDC_SPEEDHACK: {
+			bSpeedHack = !bSpeedHack;
+			uintptr_t temp = Proc::Get()->FindDMAAddy(engineAddress, maxWalkSpeedOffset);
+			static float defaultSpeed = *((float*)temp);
+			if (bSpeedHack == true)
 			{
-			case EN_CHANGE:
-				GetWindowText(hSpeedHack, (LPWSTR)str, 256);
-				break;
+				*((float*)temp) = defaultSpeed*100;
+				SendMessage(hSpeedHack, BM_SETCHECK, BST_CHECKED, 0);
+			}
+			else
+			{
+				*((float*)temp) = defaultSpeed;
+				SendMessage(hSpeedHack, BM_SETCHECK, BST_UNCHECKED, 0);
+			}
 			}
 			break;
 
-		case IDC_APPLYSPEED:
-			uintptr_t temp = Proc::Get()->FindDMAAddy(engineAddress, characterOffsets);
-			temp = Proc::Get()->FindDMAAddy(temp, characterOffsets);
-			temp = Proc::Get()->FindDMAAddy(temp, { maxWalkSpeedOffset });
-			*((float*)temp) = 3000.0f;
+		case IDC_HIGHJUMP: {
+			bHighJump = !bHighJump;
+			uintptr_t temp = Proc::Get()->FindDMAAddy(engineAddress, jumpZVelocityoffset);
+			static float defaultJump = *((float*)temp);
+			if (bHighJump == true)
+			{
+				*((float*)temp) = defaultJump*3;
+				SendMessage(hHighJump, BM_SETCHECK, BST_CHECKED, 0);
+			}
+			else
+			{
+				*((float*)temp) = defaultJump;
+				SendMessage(hHighJump, BM_SETCHECK, BST_UNCHECKED, 0);
+			}
+			}
 			break;
 		}
-
-
-		break;
-
-	case WM_PAINT:
-		hdc = BeginPaint(hWnd, &ps);
-		TextOut(hdc, 20, 50, TEXT("Speed : "), sizeof("Speed : ")-1);
-		EndPaint(hWnd, &ps);
 		break;
 
 	case WM_DESTROY:
