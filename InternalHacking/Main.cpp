@@ -1,10 +1,11 @@
 #include "Global.h"
 #include "Proc.h"
 #include "Mem.h"
+#include "Character.h"
 
 #define IDC_INFAMMO 100
-#define IDC_SPEEDHACK 101
-#define IDC_HIGHJUMP 102
+#define IDC_HEALTH 101
+#define IDC_RECOIL 102
 
 #define DLL_EXPORT extern "C" __declspec(dllexport)
 
@@ -14,14 +15,7 @@ HWND g_hWnd;
 DWORD procID;
 uintptr_t moduleBase;
 HANDLE hProcess;
-vector<UINT> characterOffsets = { 0xD28,0x38,0,0x30,0x260 };
-vector<UINT> bulletOffsets = { 0xD28,0x38,0,0x30,0x260, 0x4F8 };
-vector<UINT> maxWalkSpeedOffset = { 0xD28,0x38,0,0x30,0x260, 0x288,0x18C };
-vector<UINT> jumpZVelocityoffset = { 0xD28,0x38,0,0x30,0x260, 0x288,0x158 };
 uintptr_t engineAddress;
-bool bInfAmmo = false;
-bool bSpeedHack = false;
-bool bHighJump = false;
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 
@@ -30,62 +24,13 @@ void RegisterWndClass();
 
 DWORD WINAPI HackThread(HMODULE hModule)
 {
-    {
- //   ////Get module base
- //   //uintptr_t moduleBase = (uintptr_t)GetModuleHandle(L"Personal-Win64-Shipping.exe");
-
- //   //bool bAmmo = false;
-
- //   //vector<UINT> offsets = { 0xD28,0x38,0,0x30,0x260,0x4F8 };
- //   //uintptr_t* gEngine = (uintptr_t*)(moduleBase + 0x49F9308); //GEngine주소
- //   //uintptr_t bulletAddr = Proc::Get()->FindDMAAddy((uintptr_t)gEngine, offsets);
-
-	////Create Window
- //   // Initialize global strings
- //   
- //   LoadStringW(hInst, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
- //   LoadStringW(hInst, IDC_INTERNALHACK, szWindowClass, MAX_LOADSTRING);
- //   MyRegisterClass(hInst);
-
- //   HWND hwnd = CreateWindow(szWindowClass,
- //       szTitle,
- //       WS_OVERLAPPEDWINDOW,
- //       CW_USEDEFAULT,
- //       CW_USEDEFAULT,
- //       800,
- //       600,
- //       0,
- //       0,
- //       hInst,
- //       0);
-
- //   if(hwnd == nullptr)
- //       MessageBox(NULL, L"null", L"null", MB_OK);
-
- //   BOOL result = ShowWindow(hwnd, SW_NORMAL);
- //   if(result == FALSE)
- //       MessageBox(NULL, L"FALSE", L"FALSE", MB_OK);
-
- //   UpdateWindow(hwnd);
- //   MSG msg;
-
- //   while (GetMessage(&msg, NULL, 0, 0))
- //   {
- //       TranslateMessage(&msg);
- //       DispatchMessage(&msg);
- //   }
-
-	//FreeConsole();
-	//FreeLibraryAndExitThread(hModule, 0);
-	//return 0;
-
-    }
-
+	
 	hInstance = hModule;
 	MSG msg;
-	RegisterWndClass();
-	
-
+	RegisterWndClass();	
+	AllocConsole();
+	FILE* f;
+	freopen_s(&f, "CONOUT$", "w", stdout);
 	g_hWnd = CreateWindow(
 		L"Hacking",
 		L"Hacking",
@@ -110,26 +55,17 @@ DWORD WINAPI HackThread(HMODULE hModule)
 
 	UpdateWindow(g_hWnd);
 
-	procID = Proc::Get()->GetProcID(L"Personal-Win64-Shipping.exe");
+	//모듈 아이디 얻어오기
+	moduleBase = (uintptr_t)GetModuleHandle(L"ac_client.exe");
+	uintptr_t* player = (uintptr_t*)(moduleBase + 0x10f4f4);
+	uintptr_t* entityList = (uintptr_t*)(moduleBase + 0x10f4f8);
 
-	if (procID != NULL)
+	for (int i = 0; i < 32; i++)
 	{
-		//모듈 아이디 얻어오기
-		moduleBase = Proc::Get()->GetModuleBaseAddress(procID, L"Personal.exe");
-
-		cout << std::hex << moduleBase << endl;
-		//해킹할 프로그램의 핸들 얻어오기
-		hProcess = OpenProcess(PROCESS_ALL_ACCESS, NULL, procID); //PROCESS_ALL_ACCESS 모든 권한을 사용할 수 있게 함
-
-		//GEngine 얻어오기
-		engineAddress = moduleBase + 0x49F9308;
+		uintptr_t* entity = (uintptr_t*)(*entityList + 0x4 * i);
+		Character* character = new Character();
+		character->SetCharacterInfo((char*)(*entity+0x255), *(float*)(*entity + 0x44), *(float*)(*entity + 0x40), *(int*)(*entity + 0xF8),)
 	}
-	else
-	{
-		FreeLibraryAndExitThread(hModule, 0);
-		return 0;
-	}
-
 	while (true)
 	{
 		if (PeekMessage(&msg, g_hWnd, 0, 0, PM_REMOVE))
@@ -140,8 +76,27 @@ DWORD WINAPI HackThread(HMODULE hModule)
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);
 		}
-	}
+		else
+		{
+			for (int i = 0; i < 32; i++)
+			{
+				uintptr_t* entity = entities[i];
+				if (entity != nullptr)
+				{
+					static Rotation rotation;
+					rotation.Pitch = *(float*)(*entity + 0x44);
+					rotation.Yaw = *(float*)(*entity + 0x40);
 
+					cout << rotation.Pitch << endl;
+					cout << rotation.Yaw << endl;
+				}
+			}
+			system("cls");
+		}
+	}
+	
+	fclose(f);
+	FreeConsole();
 	FreeLibraryAndExitThread(hModule, 0);
 	return (DWORD)msg.wParam;
 }
@@ -189,71 +144,21 @@ int APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserve
 	return TRUE;
 }
 
-
-
-////프로세스 아이디 얻어오기
-//DWORD procID = Proc::Get()->GetProcID(L"Personal-Win64-Shipping.exe");
-//
-//if (procID)
-//{
-//	//모듈 아이디 얻어오기
-//	moduleBase = Proc::Get()->GetModuleBaseAddress(procID, L"Personal.exe");
-//
-//	cout << std::hex << moduleBase << endl;
-//	//해킹할 프로그램의 핸들 얻어오기
-//	hProcess = OpenProcess(PROCESS_ALL_ACCESS, NULL, procID); //PROCESS_ALL_ACCESS 모든 권한을 사용할 수 있게 함
-//
-//	////GEngine 얻어오기
-//	uintptr_t dynamicPtrBaseAddr = moduleBase + 0x49F9308;
-//
-//	////Character의 Bullet의 주소 가져오기
-//	vector<UINT> offsets = { 0xD28,0x38,0,0x30,0x260,0x4F8 };
-//	bulletAddr = Proc::Get()->FindDMAAddy(hProcess, dynamicPtrBaseAddr, offsets);
-//
-//	int current;
-//	ReadProcessMemory(hProcess, reinterpret_cast<BYTE*>(bulletAddr), &current, sizeof(int), nullptr);
-//	cout << std::dec << current << endl;
-//}
-//else
-//{
-//	cout << "프로세스가 없음" << endl;
-//	return 0;
-//	Mem::Destroy();
-//	Proc::Destroy();
-//}
-//
-//DWORD dwExit = 0;
-//while (GetExitCodeProcess(hProcess, &dwExit) && dwExit == STILL_ACTIVE)
-//{
-//	if (GetAsyncKeyState('1') & 1)
-//	{
-//		bBullet = !bBullet;
-//		if (bBullet == true)
-//			Mem::Get()->PatchEx(reinterpret_cast<BYTE*>(moduleBase + 0xE11312), (BYTE*)("/x83/x87/xF8/x04/x00/x00/x01"), 7, hProcess);
-//		else
-//			Mem::Get()->PatchEx(reinterpret_cast<BYTE*>(moduleBase + 0xE11312), (BYTE*)("/x83/x87/xF8/x04/x00/x00/x02"), 7, hProcess);
-//		cout << (bBullet ? "true" : "false") << endl;
-//	}
-//
-//	if (GetAsyncKeyState(VK_ESCAPE) & 1)
-//	{
-//		break;
-//	}
-//}
-
-LRESULT WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	static HWND hInfiniteAmmo;
-	static HWND hSpeedHack;
-	static HWND hHighJump;
+	static HWND hRecoil;
+	static HWND hHealth;
 	static char str[256];
-
+	static bool bInfAmmo = false;
+	static bool bRecoil = false;
+	static bool bHealth = false;
 	switch (message)
 	{
 	case WM_CREATE:
 		hInfiniteAmmo = CreateWindow(L"BUTTON", L"InfAmmo", WS_VISIBLE | WS_CHILD | BS_CHECKBOX, 20, 20, 100, 25, hWnd, (HMENU)IDC_INFAMMO, hInstance, NULL);
-		hSpeedHack = CreateWindow(L"BUTTON", L"Super Fast!!!!!", WS_VISIBLE | WS_CHILD | BS_CHECKBOX, 20, 50, 100, 25, hWnd, (HMENU)IDC_SPEEDHACK, hInstance, NULL);
-		hHighJump = CreateWindow(L"BUTTON", L"Jump High", WS_VISIBLE | WS_CHILD | BS_CHECKBOX, 20, 80, 100, 25, hWnd, (HMENU)IDC_HIGHJUMP, hInstance, NULL);
+		hRecoil = CreateWindow(L"BUTTON", L"No Recoil", WS_VISIBLE | WS_CHILD | BS_CHECKBOX, 20, 50, 100, 25, hWnd, (HMENU)IDC_RECOIL, hInstance, NULL);
+		hHealth = CreateWindow(L"BUTTON", L"Inf Health", WS_VISIBLE | WS_CHILD | BS_CHECKBOX, 20, 80, 100, 25, hWnd, (HMENU)IDC_HEALTH, hInstance, NULL);
 		break;
 		
 	case WM_COMMAND:
@@ -264,45 +169,42 @@ LRESULT WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			if (bInfAmmo == true)
 			{
 				SendMessage(hInfiniteAmmo, BM_SETCHECK, BST_CHECKED, 0);
-				Mem::Get()->Nop((BYTE*)(moduleBase + 0xE11312), 7);
+				Mem::Get()->Nop((BYTE*)(moduleBase + 0x637E9), 2);
+				
 			}
 			else
 			{
 				SendMessage(hInfiniteAmmo, BM_SETCHECK, BST_UNCHECKED, 0);
-				Mem::Get()->Patch((BYTE*)(moduleBase + 0xE11312), (BYTE*)"\x83\x87\xF8\x04\x00\x00\xFE", 7);
+				Mem::Get()->Patch((BYTE*)(moduleBase + 0x637E9), (BYTE*)("\xFF\x0E"), 2);
 			}
 			break;
 
-		case IDC_SPEEDHACK: {
-			bSpeedHack = !bSpeedHack;
-			uintptr_t temp = Proc::Get()->FindDMAAddy(engineAddress, maxWalkSpeedOffset);
-			static float defaultSpeed = *((float*)temp);
-			if (bSpeedHack == true)
+		case IDC_RECOIL: {
+			bRecoil = !bRecoil;
+			if (bRecoil == true)
 			{
-				*((float*)temp) = defaultSpeed*100;
-				SendMessage(hSpeedHack, BM_SETCHECK, BST_CHECKED, 0);
+				Mem::Get()->Nop((BYTE*)(moduleBase+0x63786),10);
+				SendMessage(hRecoil, BM_SETCHECK, BST_CHECKED, 0);
 			}
 			else
 			{
-				*((float*)temp) = defaultSpeed;
-				SendMessage(hSpeedHack, BM_SETCHECK, BST_UNCHECKED, 0);
+				Mem::Get()->Patch((BYTE*)(moduleBase + 0x63786), (BYTE*)("\x50\x8D\x4C\x24\x1C\x51\x8B\xCE\xFF\xD2"), 10);
+				SendMessage(hRecoil, BM_SETCHECK, BST_UNCHECKED, 0);
 			}
 			}
 			break;
 
-		case IDC_HIGHJUMP: {
-			bHighJump = !bHighJump;
-			uintptr_t temp = Proc::Get()->FindDMAAddy(engineAddress, jumpZVelocityoffset);
-			static float defaultJump = *((float*)temp);
-			if (bHighJump == true)
+		case IDC_HEALTH: {
+			bHealth = !bHealth;
+			if (bHealth == true)
 			{
-				*((float*)temp) = defaultJump*3;
-				SendMessage(hHighJump, BM_SETCHECK, BST_CHECKED, 0);
+				Mem::Get()->Nop((BYTE*)(moduleBase + 0x2CA5E), 6);
+				SendMessage(hHealth, BM_SETCHECK, BST_CHECKED, 0);
 			}
 			else
 			{
-				*((float*)temp) = defaultJump;
-				SendMessage(hHighJump, BM_SETCHECK, BST_UNCHECKED, 0);
+				Mem::Get()->Patch((BYTE*)(moduleBase + 0x2CA5E), (BYTE*)("\x89\x82\xF8\x00\x00\x00"), 6);
+				SendMessage(hHealth, BM_SETCHECK, BST_UNCHECKED, 0);
 			}
 			}
 			break;
