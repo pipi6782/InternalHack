@@ -6,6 +6,4 @@
 #include <TlHelp32.h>
 using namespace std;
 
-
-
-
+struct Vec3 { float x, y, z; };

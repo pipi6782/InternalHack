@@ -2,10 +2,12 @@
 #include "Proc.h"
 #include "Mem.h"
 #include "Character.h"
+#include "Weapon.h"
 
 #define IDC_INFAMMO 100
 #define IDC_HEALTH 101
 #define IDC_RECOIL 102
+#define IDC_AUTOSHOT 103
 
 #define DLL_EXPORT extern "C" __declspec(dllexport)
 
@@ -16,11 +18,18 @@ DWORD procID;
 uintptr_t moduleBase;
 HANDLE hProcess;
 uintptr_t engineAddress;
+vector<uintptr_t> ammoAddress = { 0x374,0x14,0 };
+vector<Character*> characters;
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 
 void RegisterWndClass();
 
+typedef Character* (__cdecl* tGetCrossHair)();
+
+tGetCrossHair GetCrossHair = nullptr;
+
+bool bTrigger = false;
 
 DWORD WINAPI HackThread(HMODULE hModule)
 {
@@ -57,15 +66,11 @@ DWORD WINAPI HackThread(HMODULE hModule)
 
 	//모듈 아이디 얻어오기
 	moduleBase = (uintptr_t)GetModuleHandle(L"ac_client.exe");
-	uintptr_t* player = (uintptr_t*)(moduleBase + 0x10f4f4);
+	int* numOfPlayers = (int*)(moduleBase + 0x10F500);
+	Character* player = *(Character**)(moduleBase + 0x10f4f4);
 	uintptr_t* entityList = (uintptr_t*)(moduleBase + 0x10f4f8);
+	GetCrossHair = (tGetCrossHair)(moduleBase + 0x607C0);
 
-	for (int i = 0; i < 32; i++)
-	{
-		uintptr_t* entity = (uintptr_t*)(*entityList + 0x4 * i);
-		Character* character = new Character();
-		character->SetCharacterInfo((char*)(*entity+0x255), *(float*)(*entity + 0x44), *(float*)(*entity + 0x40), *(int*)(*entity + 0xF8),)
-	}
 	while (true)
 	{
 		if (PeekMessage(&msg, g_hWnd, 0, 0, PM_REMOVE))
@@ -78,18 +83,18 @@ DWORD WINAPI HackThread(HMODULE hModule)
 		}
 		else
 		{
-			for (int i = 0; i < 32; i++)
+			cout << *numOfPlayers << endl;
+			if (bTrigger == true)
 			{
-				uintptr_t* entity = entities[i];
-				if (entity != nullptr)
-				{
-					static Rotation rotation;
-					rotation.Pitch = *(float*)(*entity + 0x44);
-					rotation.Yaw = *(float*)(*entity + 0x40);
+				Character* crossHair = GetCrossHair();
 
-					cout << rotation.Pitch << endl;
-					cout << rotation.Yaw << endl;
+				if (crossHair != nullptr)
+				{
+					if (player->team != crossHair->team)
+						player->bAttack = 1;
 				}
+				else
+					player->bAttack = 0;
 			}
 			system("cls");
 		}
@@ -132,8 +137,6 @@ int APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserve
 	case DLL_THREAD_ATTACH:
 	case DLL_THREAD_DETACH:
 	case DLL_PROCESS_DETACH:
-		break;
-
 	default:
 		break;
 	}
@@ -149,6 +152,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	static HWND hInfiniteAmmo;
 	static HWND hRecoil;
 	static HWND hHealth;
+	static HWND hTrigger;
 	static char str[256];
 	static bool bInfAmmo = false;
 	static bool bRecoil = false;
@@ -159,6 +163,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		hInfiniteAmmo = CreateWindow(L"BUTTON", L"InfAmmo", WS_VISIBLE | WS_CHILD | BS_CHECKBOX, 20, 20, 100, 25, hWnd, (HMENU)IDC_INFAMMO, hInstance, NULL);
 		hRecoil = CreateWindow(L"BUTTON", L"No Recoil", WS_VISIBLE | WS_CHILD | BS_CHECKBOX, 20, 50, 100, 25, hWnd, (HMENU)IDC_RECOIL, hInstance, NULL);
 		hHealth = CreateWindow(L"BUTTON", L"Inf Health", WS_VISIBLE | WS_CHILD | BS_CHECKBOX, 20, 80, 100, 25, hWnd, (HMENU)IDC_HEALTH, hInstance, NULL);
+		hTrigger = CreateWindow(L"BUTTON", L"Auto Shoot", WS_VISIBLE | WS_CHILD | BS_CHECKBOX, 20, 110, 100, 25, hWnd, (HMENU)IDC_AUTOSHOT, hInstance, NULL);
 		break;
 		
 	case WM_COMMAND:
@@ -170,7 +175,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			{
 				SendMessage(hInfiniteAmmo, BM_SETCHECK, BST_CHECKED, 0);
 				Mem::Get()->Nop((BYTE*)(moduleBase + 0x637E9), 2);
-				
 			}
 			else
 			{
@@ -194,7 +198,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			}
 			break;
 
-		case IDC_HEALTH: {
+		case IDC_HEALTH: 
 			bHealth = !bHealth;
 			if (bHealth == true)
 			{
@@ -206,6 +210,17 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				Mem::Get()->Patch((BYTE*)(moduleBase + 0x2CA5E), (BYTE*)("\x89\x82\xF8\x00\x00\x00"), 6);
 				SendMessage(hHealth, BM_SETCHECK, BST_UNCHECKED, 0);
 			}
+			break;
+
+		case IDC_AUTOSHOT :
+			bTrigger = !bTrigger;
+			if (bTrigger == true)
+			{
+				SendMessage(hTrigger, BM_SETCHECK, BST_CHECKED, 0);
+			}
+			else
+			{
+				SendMessage(hTrigger, BM_SETCHECK, BST_UNCHECKED, 0);
 			}
 			break;
 		}
