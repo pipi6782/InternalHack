@@ -6,7 +6,7 @@ public:
 	Vec3 headPos;
 	char padding2[36];
 	Vec3 position;
-	Vec3 roation;
+	Vec3 rotation;
 	char padding3[172];
 	int32_t health;
 	char padding4[296];

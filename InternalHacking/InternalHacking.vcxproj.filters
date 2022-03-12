@@ -6,6 +6,7 @@
     <ClCompile Include="Proc.cpp" />
     <ClCompile Include="Character.cpp" />
     <ClCompile Include="Weapon.cpp" />
+    <ClCompile Include="AimbotMgr.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Global.h" />
@@ -15,5 +16,6 @@
     <ClInclude Include="Resource.h" />
     <ClInclude Include="Character.h" />
     <ClInclude Include="Weapon.h" />
+    <ClInclude Include="AimbotMgr.h" />
   </ItemGroup>
 </Project>

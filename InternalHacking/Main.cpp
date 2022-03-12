@@ -3,6 +3,7 @@
 #include "Mem.h"
 #include "Character.h"
 #include "Weapon.h"
+#include "AimbotMgr.h"
 
 #define IDC_INFAMMO 100
 #define IDC_HEALTH 101
@@ -19,7 +20,7 @@ uintptr_t moduleBase;
 HANDLE hProcess;
 uintptr_t engineAddress;
 vector<uintptr_t> ammoAddress = { 0x374,0x14,0 };
-vector<Character*> characters;
+
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 
@@ -33,7 +34,9 @@ bool bTrigger = false;
 
 DWORD WINAPI HackThread(HMODULE hModule)
 {
-	
+	Proc::Create();
+	Mem::Create();
+	AimbotMgr::Create();
 	hInstance = hModule;
 	MSG msg;
 	RegisterWndClass();	
@@ -71,6 +74,13 @@ DWORD WINAPI HackThread(HMODULE hModule)
 	uintptr_t* entityList = (uintptr_t*)(moduleBase + 0x10f4f8);
 	GetCrossHair = (tGetCrossHair)(moduleBase + 0x607C0);
 
+	for (int i = 1; i < *numOfPlayers; i++)
+	{
+		Character* entity = *(Character**)(*entityList + 0x4 * i);
+		if (entity != nullptr)
+			if (player->team != entity->team)
+				AimbotMgr::Get()->AddEntity(entity);
+	}
 	while (true)
 	{
 		if (PeekMessage(&msg, g_hWnd, 0, 0, PM_REMOVE))
@@ -83,7 +93,6 @@ DWORD WINAPI HackThread(HMODULE hModule)
 		}
 		else
 		{
-			cout << *numOfPlayers << endl;
 			if (bTrigger == true)
 			{
 				Character* crossHair = GetCrossHair();
@@ -96,9 +105,16 @@ DWORD WINAPI HackThread(HMODULE hModule)
 				else
 					player->bAttack = 0;
 			}
+			if (GetAsyncKeyState(VK_LBUTTON) && bTrigger == false)
+				AimbotMgr::Get()->TraceEntity(player);
+
 			system("cls");
 		}
 	}
+	
+	AimbotMgr::Destroy();
+	Proc::Destroy();
+	Mem::Destroy();
 	
 	fclose(f);
 	FreeConsole();
@@ -126,8 +142,6 @@ void RegisterWndClass()
 
 int APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserved)
 {
-	Proc::Create();
-	Mem::Create();
 	switch (ul_reason_for_call)
 	{
 	case DLL_PROCESS_ATTACH:
@@ -140,10 +154,6 @@ int APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserve
 	default:
 		break;
 	}
-
-	Proc::Destroy();
-	Mem::Destroy();
-
 	return TRUE;
 }
 
@@ -153,10 +163,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	static HWND hRecoil;
 	static HWND hHealth;
 	static HWND hTrigger;
-	static char str[256];
 	static bool bInfAmmo = false;
 	static bool bRecoil = false;
 	static bool bHealth = false;
+
 	switch (message)
 	{
 	case WM_CREATE:
@@ -165,7 +175,20 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		hHealth = CreateWindow(L"BUTTON", L"Inf Health", WS_VISIBLE | WS_CHILD | BS_CHECKBOX, 20, 80, 100, 25, hWnd, (HMENU)IDC_HEALTH, hInstance, NULL);
 		hTrigger = CreateWindow(L"BUTTON", L"Auto Shoot", WS_VISIBLE | WS_CHILD | BS_CHECKBOX, 20, 110, 100, 25, hWnd, (HMENU)IDC_AUTOSHOT, hInstance, NULL);
 		break;
-		
+
+	case WM_KEYDOWN:
+		switch (wParam)
+		{
+		case VK_LEFT :
+			AimbotMgr::Get()->ChangeTarget(EChangeType::Prev);
+			break;
+
+		case VK_RIGHT :
+			AimbotMgr::Get()->ChangeTarget(EChangeType::Next);
+			break;
+		}
+		break;
+
 	case WM_COMMAND:
 		switch (LOWORD(wParam))
 		{
