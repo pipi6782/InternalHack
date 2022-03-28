@@ -72,7 +72,7 @@ uintptr_t Proc::GetModuleBaseAddress(DWORD procID, const wchar_t* moduleName)
     return moduleBaseAddr;
 }
 
-uintptr_t Proc::FindDMAAddy(HANDLE hProc, uintptr_t ptr, vector<UINT> offsets)
+uintptr_t Proc::FindDMAAddy(HANDLE hProc, uintptr_t ptr, std::vector<UINT> offsets)
 {
     uintptr_t addr = ptr;
     for (UINT i = 0; i < offsets.size(); i++)
@@ -83,7 +83,7 @@ uintptr_t Proc::FindDMAAddy(HANDLE hProc, uintptr_t ptr, vector<UINT> offsets)
     return addr;
 }
 
-uintptr_t Proc::FindDMAAddy(uintptr_t ptr, vector<UINT> offsets)
+uintptr_t Proc::FindDMAAddy(uintptr_t ptr, std::vector<UINT> offsets)
 {
     uintptr_t addr = ptr;
     for (UINT i = 0; i < offsets.size(); i++)

@@ -5,6 +5,11 @@ VisualStudioVersion = 16.0.31729.503
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "InternalHacking", "InternalHacking\InternalHacking.vcxproj", "{1AC1145E-EEDE-43D9-93A6-0E17FF8E4D3E}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Shader", "Shader", "{440A9E38-81B4-4D17-ABB0-624D1CE17214}"
+	ProjectSection(SolutionItems) = preProject
+		Shaders\Cube.fx = Shaders\Cube.fx
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64

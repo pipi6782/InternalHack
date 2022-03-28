@@ -1,14 +1,16 @@
 #include "Global.h"
-#include "Proc.h"
-#include "Mem.h"
-#include "Character.h"
-#include "Weapon.h"
-#include "AimbotMgr.h"
+#include "Aimbot/Proc.h"
+#include "Aimbot/Mem.h"
+#include "Aimbot/Character.h"
+#include "Aimbot/Weapon.h"
+#include "Aimbot/AimbotMgr.h"
+#include "ESP/ESPManager.h"
 
 #define IDC_INFAMMO 100
 #define IDC_HEALTH 101
 #define IDC_RECOIL 102
 #define IDC_AUTOSHOT 103
+#define IDC_ENTITIES 104
 
 #define DLL_EXPORT extern "C" __declspec(dllexport)
 
@@ -19,12 +21,17 @@ DWORD procID;
 uintptr_t moduleBase;
 HANDLE hProcess;
 uintptr_t engineAddress;
-vector<uintptr_t> ammoAddress = { 0x374,0x14,0 };
+std::vector<uintptr_t> ammoAddress = { 0x374,0x14,0 };
+int* numOfPlayers;
+Character* player;
+uintptr_t* entityList;
 
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 
 void RegisterWndClass();
+
+void GetEntities();
 
 typedef Character* (__cdecl* tGetCrossHair)();
 
@@ -32,20 +39,35 @@ tGetCrossHair GetCrossHair = nullptr;
 
 bool bTrigger = false;
 
-DWORD WINAPI HackThread(HMODULE hModule)
+void Init()
 {
 	Proc::Create();
 	Mem::Create();
 	AimbotMgr::Create();
-	hInstance = hModule;
+	ESPManager::Create();
+}
+
+void Destroy()
+{
+	AimbotMgr::Destroy();
+	Proc::Destroy();
+	Mem::Destroy();
+	ESPManager::Destroy();
+}
+
+DWORD WINAPI HackThread(HMODULE hModule)
+{
+	hInstance = (HINSTANCE)hModule;
 	MSG msg;
 	RegisterWndClass();	
 	AllocConsole();
 	FILE* f;
 	freopen_s(&f, "CONOUT$", "w", stdout);
-	g_hWnd = CreateWindow(
-		L"Hacking",
-		L"Hacking",
+
+	g_hWnd = CreateWindowEx(
+		WS_EX_APPWINDOW,
+		L"HACKING",
+		L"HACKING",
 		WS_OVERLAPPEDWINDOW,
 		CW_USEDEFAULT,
 		CW_USEDEFAULT,
@@ -57,11 +79,15 @@ DWORD WINAPI HackThread(HMODULE hModule)
 		NULL
 	);
 
+	Init();
+
 	if (g_hWnd == nullptr)
 	{
 		FreeLibraryAndExitThread(hModule, 0);
 		return 0;
 	}
+
+	HWND hWnd = FindWindow(NULL, L"AssaultCube");
 
 	ShowWindow(g_hWnd, SW_SHOW);
 
@@ -69,18 +95,18 @@ DWORD WINAPI HackThread(HMODULE hModule)
 
 	//모듈 아이디 얻어오기
 	moduleBase = (uintptr_t)GetModuleHandle(L"ac_client.exe");
-	int* numOfPlayers = (int*)(moduleBase + 0x10F500);
-	Character* player = *(Character**)(moduleBase + 0x10f4f4);
-	uintptr_t* entityList = (uintptr_t*)(moduleBase + 0x10f4f8);
+	numOfPlayers = (int*)(moduleBase + 0x10F500);
+	player = *(Character**)(moduleBase + 0x10f4f4);
+	entityList = (uintptr_t*)(moduleBase + 0x10f4f8);
 	GetCrossHair = (tGetCrossHair)(moduleBase + 0x607C0);
 
-	for (int i = 1; i < *numOfPlayers; i++)
-	{
-		Character* entity = *(Character**)(*entityList + 0x4 * i);
-		if (entity != nullptr)
-			if (player->team != entity->team)
-				AimbotMgr::Get()->AddEntity(entity);
-	}
+	GetEntities();
+
+	AimbotMgr::Get()->SetPlayer(player);
+	ESPManager::Get()->SetPlayer(player);
+	
+	//ESPManager::Get()->Run();
+
 	while (true)
 	{
 		if (PeekMessage(&msg, g_hWnd, 0, 0, PM_REMOVE))
@@ -105,21 +131,39 @@ DWORD WINAPI HackThread(HMODULE hModule)
 				else
 					player->bAttack = 0;
 			}
-			if (GetAsyncKeyState(VK_LBUTTON) && bTrigger == false)
-				AimbotMgr::Get()->TraceEntity(player);
-
-			system("cls");
+			POINT p;
+			GetCursorPos(&p);
+			if (WindowFromPoint(p) == hWnd)
+			{
+				if (GetAsyncKeyState(VK_LBUTTON) && bTrigger == false)
+					AimbotMgr::Get()->TraceEntity();
+				else
+					AimbotMgr::Get()->ResetTarget();
+			}
+			
+			ESPManager::Get()->RunEspThread();
 		}
 	}
 	
-	AimbotMgr::Destroy();
-	Proc::Destroy();
-	Mem::Destroy();
-	
+	Destroy();
+
 	fclose(f);
 	FreeConsole();
 	FreeLibraryAndExitThread(hModule, 0);
 	return (DWORD)msg.wParam;
+}
+
+void GetEntities()
+{
+	for (int i = 1; i <= *numOfPlayers -1; i++)
+	{
+		Character* entity = *(Character**)(*entityList + 0x4 * i);
+		if (entity != nullptr)
+		{
+			AimbotMgr::Get()->AddEntity(entity, *numOfPlayers - 1);
+			ESPManager::Get()->AddEntity(entity, *numOfPlayers - 1);
+		}
+	}
 }
 
 void RegisterWndClass()
@@ -133,7 +177,7 @@ void RegisterWndClass()
 	wndClass.hIcon = NULL;
 	wndClass.hInstance = hInstance;
 	wndClass.lpfnWndProc = WndProc;
-	wndClass.lpszClassName = L"Hacking";
+	wndClass.lpszClassName = L"HACKING";
 	wndClass.lpszMenuName = NULL;
 	wndClass.style = CS_HREDRAW | CS_VREDRAW;
 
@@ -163,6 +207,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	static HWND hRecoil;
 	static HWND hHealth;
 	static HWND hTrigger;
+	static HWND hEntities;
 	static bool bInfAmmo = false;
 	static bool bRecoil = false;
 	static bool bHealth = false;
@@ -174,19 +219,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		hRecoil = CreateWindow(L"BUTTON", L"No Recoil", WS_VISIBLE | WS_CHILD | BS_CHECKBOX, 20, 50, 100, 25, hWnd, (HMENU)IDC_RECOIL, hInstance, NULL);
 		hHealth = CreateWindow(L"BUTTON", L"Inf Health", WS_VISIBLE | WS_CHILD | BS_CHECKBOX, 20, 80, 100, 25, hWnd, (HMENU)IDC_HEALTH, hInstance, NULL);
 		hTrigger = CreateWindow(L"BUTTON", L"Auto Shoot", WS_VISIBLE | WS_CHILD | BS_CHECKBOX, 20, 110, 100, 25, hWnd, (HMENU)IDC_AUTOSHOT, hInstance, NULL);
-		break;
-
-	case WM_KEYDOWN:
-		switch (wParam)
-		{
-		case VK_LEFT :
-			AimbotMgr::Get()->ChangeTarget(EChangeType::Prev);
-			break;
-
-		case VK_RIGHT :
-			AimbotMgr::Get()->ChangeTarget(EChangeType::Next);
-			break;
-		}
+		hEntities = CreateWindow(L"BUTTON", L"Get Entities", WS_VISIBLE | WS_CHILD, 20, 140, 100, 25, hWnd, (HMENU)IDC_ENTITIES, hInstance, NULL);
 		break;
 
 	case WM_COMMAND:
@@ -234,7 +267,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				SendMessage(hHealth, BM_SETCHECK, BST_UNCHECKED, 0);
 			}
 			break;
-
+			
 		case IDC_AUTOSHOT :
 			bTrigger = !bTrigger;
 			if (bTrigger == true)
@@ -245,6 +278,13 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			{
 				SendMessage(hTrigger, BM_SETCHECK, BST_UNCHECKED, 0);
 			}
+			break;
+
+		case IDC_ENTITIES:
+			GetEntities();
+			break;
+
+		default :
 			break;
 		}
 		break;

@@ -80,6 +80,8 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(DH);</IncludePath>
+    <LibraryPath>$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(DL);</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
@@ -91,10 +93,14 @@
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>false</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalIncludeDirectories>../../_Libraries;./;</AdditionalIncludeDirectories>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>Global.h</PrecompiledHeaderFile>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>../../_Libraries;</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -119,6 +125,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>./;../../_Libraries;</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -143,22 +150,26 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="AimbotMgr.cpp" />
-    <ClCompile Include="Character.cpp" />
+    <ClCompile Include="Aimbot\AimbotMgr.cpp" />
+    <ClCompile Include="Aimbot\Character.cpp" />
+    <ClCompile Include="Aimbot\Mem.cpp" />
+    <ClCompile Include="Aimbot\Proc.cpp" />
+    <ClCompile Include="Aimbot\Weapon.cpp" />
+    <ClCompile Include="ESP\ESPManager.cpp" />
+    <ClCompile Include="Global.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="Main.cpp" />
-    <ClCompile Include="Mem.cpp" />
-    <ClCompile Include="Proc.cpp" />
-    <ClCompile Include="Weapon.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="AimbotMgr.h" />
-    <ClInclude Include="Character.h" />
+    <ClInclude Include="Aimbot\AimbotMgr.h" />
+    <ClInclude Include="Aimbot\Character.h" />
+    <ClInclude Include="Aimbot\Mem.h" />
+    <ClInclude Include="Aimbot\Proc.h" />
+    <ClInclude Include="Aimbot\Weapon.h" />
     <ClInclude Include="Defines.h" />
+    <ClInclude Include="ESP\ESPManager.h" />
     <ClInclude Include="Global.h" />
-    <ClInclude Include="Mem.h" />
-    <ClInclude Include="Proc.h" />
-    <ClInclude Include="Resource.h" />
-    <ClInclude Include="Weapon.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
