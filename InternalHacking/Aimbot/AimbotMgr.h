@@ -8,7 +8,7 @@ enum class EChangeType
 class AimbotMgr
 {
 private:
-	AimbotMgr() = default;
+	AimbotMgr();
 	~AimbotMgr() = default;
 
 public:

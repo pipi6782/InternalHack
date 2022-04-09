@@ -10,7 +10,7 @@
 #define IDC_HEALTH 101
 #define IDC_RECOIL 102
 #define IDC_AUTOSHOT 103
-#define IDC_ENTITIES 104
+#define IDC_AIMBOT 104
 
 #define DLL_EXPORT extern "C" __declspec(dllexport)
 
@@ -25,6 +25,7 @@ std::vector<uintptr_t> ammoAddress = { 0x374,0x14,0 };
 int* numOfPlayers;
 Character* player;
 uintptr_t* entityList;
+static bool bRunAimbot = false;
 
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
@@ -33,11 +34,18 @@ void RegisterWndClass();
 
 void GetEntities();
 
-typedef Character* (__cdecl* tGetCrossHair)();
-
 tGetCrossHair GetCrossHair = nullptr;
 
 bool bTrigger = false;
+
+bool IsTeamGame()
+{
+	if ((*(int*)(0x50F49C) == 0 || *(int*)(0x50F49C) == 4 || *(int*)(0x50F49C) == 5 || *(int*)(0x50F49C) == 7 ||
+		*(int*)(0x50F49C) == 11 || *(int*)(0x50F49C) == 13 || *(int*)(0x50F49C) == 14 || *(int*)(0x50F49C) == 16 ||
+		*(int*)(0x50F49C) == 17 || *(int*)(0x50F49C) == 20 || *(int*)(0x50F49C) == 21))
+		return true;
+	else return false;
+}
 
 void Init()
 {
@@ -60,9 +68,6 @@ DWORD WINAPI HackThread(HMODULE hModule)
 	hInstance = (HINSTANCE)hModule;
 	MSG msg;
 	RegisterWndClass();	
-	AllocConsole();
-	FILE* f;
-	freopen_s(&f, "CONOUT$", "w", stdout);
 
 	g_hWnd = CreateWindowEx(
 		WS_EX_APPWINDOW,
@@ -105,7 +110,7 @@ DWORD WINAPI HackThread(HMODULE hModule)
 	AimbotMgr::Get()->SetPlayer(player);
 	ESPManager::Get()->SetPlayer(player);
 	
-	//ESPManager::Get()->Run();
+	ESPManager::Get()->Run();
 
 	while (true)
 	{
@@ -119,36 +124,30 @@ DWORD WINAPI HackThread(HMODULE hModule)
 		}
 		else
 		{
+			if (IsWindow(hWnd) == false)
+				break;
 			if (bTrigger == true)
 			{
 				Character* crossHair = GetCrossHair();
 
 				if (crossHair != nullptr)
 				{
-					if (player->team != crossHair->team)
+					if (player->team != crossHair->team || IsTeamGame() == false)
 						player->bAttack = 1;
 				}
 				else
 					player->bAttack = 0;
 			}
-			POINT p;
-			GetCursorPos(&p);
-			if (WindowFromPoint(p) == hWnd)
-			{
-				if (GetAsyncKeyState(VK_LBUTTON) && bTrigger == false)
-					AimbotMgr::Get()->TraceEntity();
-				else
-					AimbotMgr::Get()->ResetTarget();
-			}
-			
-			ESPManager::Get()->RunEspThread();
+
+			if (GetAsyncKeyState(VK_LBUTTON) && bTrigger == false && bRunAimbot == true)
+				AimbotMgr::Get()->TraceEntity();
+			else
+				AimbotMgr::Get()->ResetTarget();
 		}
 	}
 	
 	Destroy();
 
-	fclose(f);
-	FreeConsole();
 	FreeLibraryAndExitThread(hModule, 0);
 	return (DWORD)msg.wParam;
 }
@@ -207,7 +206,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	static HWND hRecoil;
 	static HWND hHealth;
 	static HWND hTrigger;
-	static HWND hEntities;
+	static HWND hRunAimbot;
 	static bool bInfAmmo = false;
 	static bool bRecoil = false;
 	static bool bHealth = false;
@@ -219,7 +218,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		hRecoil = CreateWindow(L"BUTTON", L"No Recoil", WS_VISIBLE | WS_CHILD | BS_CHECKBOX, 20, 50, 100, 25, hWnd, (HMENU)IDC_RECOIL, hInstance, NULL);
 		hHealth = CreateWindow(L"BUTTON", L"Inf Health", WS_VISIBLE | WS_CHILD | BS_CHECKBOX, 20, 80, 100, 25, hWnd, (HMENU)IDC_HEALTH, hInstance, NULL);
 		hTrigger = CreateWindow(L"BUTTON", L"Auto Shoot", WS_VISIBLE | WS_CHILD | BS_CHECKBOX, 20, 110, 100, 25, hWnd, (HMENU)IDC_AUTOSHOT, hInstance, NULL);
-		hEntities = CreateWindow(L"BUTTON", L"Get Entities", WS_VISIBLE | WS_CHILD, 20, 140, 100, 25, hWnd, (HMENU)IDC_ENTITIES, hInstance, NULL);
+		hRunAimbot = CreateWindow(L"BUTTON", L"Run Aimbot", WS_VISIBLE | WS_CHILD | BS_CHECKBOX, 20, 140, 100, 25, hWnd, (HMENU)IDC_AIMBOT, hInstance, NULL);
 		break;
 
 	case WM_COMMAND:
@@ -280,8 +279,16 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			}
 			break;
 
-		case IDC_ENTITIES:
-			GetEntities();
+		case IDC_AIMBOT:
+			bRunAimbot = !bRunAimbot;
+			if (bRunAimbot == true)
+			{
+				SendMessage(hRunAimbot, BM_SETCHECK, BST_CHECKED, 0);
+			}
+			else
+			{
+				SendMessage(hRunAimbot, BM_SETCHECK, BST_UNCHECKED, 0);
+			}
 			break;
 
 		default :

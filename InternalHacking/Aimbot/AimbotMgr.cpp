@@ -4,6 +4,11 @@
 
 AimbotMgr* AimbotMgr::instance = nullptr;
 
+AimbotMgr::AimbotMgr()
+{
+    targetIndex = 0;
+}
+
 void AimbotMgr::Create()
 {
     if (instance == nullptr)
@@ -36,7 +41,8 @@ void AimbotMgr::TraceEntity()
 
     Vector3 rotation = FindRotation(player, target);
 
-    player->rotation = rotation;    
+    Vector3 temp = player->rotation;
+    player->rotation = rotation;   
 }
 
 Vector3 AimbotMgr::FindRotation(Character* from, Character* to)

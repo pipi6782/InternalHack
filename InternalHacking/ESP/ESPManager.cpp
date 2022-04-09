@@ -8,19 +8,14 @@ ESPManager::ESPManager()
 {
 	hWnd = FindWindow(NULL, L"AssaultCube");
 	hdc = GetDC(hWnd);
-	/*for (int i = 0; i < 4; i++)
-	{
-		espThreads.push_back(std::thread(&ESPManager::RunEspThread));
-	}*/
-
 }
 
 ESPManager::~ESPManager()
 {
-	/*for (int i = 0; i < 4; i++)
+	for (int i = 0; i < 4; i++)
 	{
-		espThreads[i].join();
-	}*/
+		espThreads[i].detach();
+	}
 }
 
 void ESPManager::AddEntity(Character* entity, int numofEntities)
@@ -44,6 +39,14 @@ void ESPManager::ChangeTarget()
 			target = entities[i];
 			length = temp;
 		}
+	}
+}
+
+void ESPManager::Run()
+{
+	for (int i = 0; i < 4; i++)
+	{
+		espThreads.push_back(std::thread(std::bind(&ESPManager::RunEspThread,this)));
 	}
 }
 
@@ -95,18 +98,73 @@ bool ESPManager::IsTeamGame()
 	else return false;
 }
 
+void ESPManager::DrawBorderBox(int x, int y, int w, int h, int thickness)
+{
+	HBRUSH color = CreateSolidBrush(RGB(255, 255, 255));
+	DrawFilledRect(x + 2, y, w - 2, thickness, color);
+	DrawFilledRect(x, y, thickness, h, color);
+	DrawFilledRect((x + w), y, thickness, h, color);
+	DrawFilledRect(x, y + h, w + thickness, thickness, color);
+	DeleteObject(color);
+}
+
+void ESPManager::DrawFilledRect(int x, int y, int w, int h, HBRUSH color)
+{
+	if (color == nullptr)
+	{
+		color = CreateSolidBrush(RGB(255, 0, 0));
+		RECT rect = { x, y, x + w, y + h };
+		FillRect(hdc, &rect, color);
+		DeleteObject(color);
+	}
+	else
+	{
+		RECT rect = { x, y, x + w, y + h };
+		FillRect(hdc, &rect, color);
+	}
+}
+
+
 void ESPManager::RunEspThread()
 {
-	float* mat = (float*)(0x501AE8);
+	float* temp = (float*)(0x501AE8);
+	float mat[16] = { 0 };
 	RECT rect;
 	GetClientRect(hWnd, &rect);
 	Vector2 screenPos, screenPosHead;
-	for (Character* entity : entities)
+	while (true)
+	{
+		bool bEnableWindow = IsWindow(hWnd) == false;
+		if (bEnableWindow)
+			break;
+		m.lock();
+		targetIndex += 1;
+		targetIndex %= entities.size();
+		int index = targetIndex;
+		m.unlock();
+		for (int i = 0; i < 16; i++)
+			mat[i] = temp[i];
+		bool b = true;
+		b &= WorldToScreen(entities[index]->position, screenPos, mat, rect.right - rect.left, rect.bottom - rect.top);
+		b &= WorldToScreen(entities[index]->headPos, screenPosHead, mat, rect.right - rect.left, rect.bottom - rect.top);
+		b &= (IsTeamGame() == false || entities[index]->team != player->team);
+		b &= (entities[index]->health > 0.0f);
+		if (b == true)
+		{
+			float height = screenPosHead.y - screenPos.y;
+			float width = height / 2.4f;
+			DrawBorderBox(screenPos.x - (width / 2), screenPos.y, width, height, 2);
+			std::string str = std::to_string(entities[index]->health) + "/100";
+			DrawFilledRect(screenPos.x + width + 1, screenPos.y , 5 , height * entities[index]->health / 100);
+		}
+	}
+	/*for (Character* entity : entities)
 	{
 		bool b = true;
 		b &= WorldToScreen(entity->position, screenPos, mat, rect.right - rect.left, rect.bottom-rect.top);
 		b &= WorldToScreen(entity->headPos, screenPosHead, mat, rect.right - rect.left, rect.bottom-rect.top);
 		b &= (IsTeamGame() == false || entity->team != player->team);
+		b &= (entity->health > 0.0f);
 		if (b == true)
 		{
 			float height = screenPosHead.y - screenPos.y;
@@ -116,7 +174,9 @@ void ESPManager::RunEspThread()
 			rect.right = static_cast<LONG>(screenPos.x + width / 2);
 			rect.top = static_cast<LONG>(screenPosHead.y);
 			rect.bottom = static_cast<LONG>(screenPos.y);
-			FillRect(hdc, &rect, CreateSolidBrush(COLORREF(RGB(255,0,0))));
+			HBRUSH hBrush = CreateSolidBrush(RGB(255, 0, 0));
+			FillRect(hdc, &rect, hBrush);
+			DeleteObject(hBrush);
 		}
-	}
+	}*/
 }
