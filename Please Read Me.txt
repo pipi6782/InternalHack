@@ -1,0 +1,13 @@
+에임핵 실행순서
+1. Assualt Cube를 설치합니다.
+2. 솔루션 파일에 들어가서 프로젝트를 빌드합니다.
+3. 설치가 끝나셨으면 Assualt Cube를 실행시킨 후 아무 모드에 들어갑니다. (ESC를 이용해서 조작가능합니다. 게임을 실행시키자 마자 나오는 맵에는 적이 아예 없어서 인젝터를 실행시키면 프로그램과 함께 게임이 터지게 됩니다. 이 때, 상대가 몇명이던 상관없습니다.)
+4. SimpleDllInjector.exe파일을 실행합니다.
+
+인젝터를 실행시키면 바로 적들의 위치와 체력이 표시되고 윈도우창이 생성됩니다.
+원하는 기능을 켰다 껐다 하시면서 이용하시면 됩니다.
+
+이 프로젝트는 에임핵 프로젝트입니다.
+에임핵 포트폴리오 설명 영상 링크는 https://www.youtube.com/watch?v=ex_VNt6QAFM 입니다.
+언리얼 포트폴리오 github링크는 https://github.com/pipi6782/Portfolio 이고
+설명영상은 https://www.youtube.com/watch?v=KGPyTTVJ9t4 입니다.
